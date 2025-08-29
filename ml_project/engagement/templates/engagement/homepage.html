@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ML Data Pipeline</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background:#f4f4f4; }
+    .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .row { display:flex; gap:12px; margin-top:16px; }
+    button { padding:10px 16px; border:0; border-radius:8px; cursor:pointer; color:#fff; background:#007bff; }
+    button.secondary { background:#6c757d; }
+    .hidden { display:none; }
+    .hint { font-size:14px; color:#444; }
+    
+    /* Dashboard Styles */
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0; }
+    .metric-card { background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; border-left: 4px solid #007bff; }
+    .metric-value { font-size: 2em; font-weight: bold; color: #007bff; margin: 10px 0; }
+    .metric-label { color: #666; font-size: 0.9em; }
+    
+    .charts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 30px 0; }
+    .chart-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+    .chart-title { font-size: 1.2em; margin-bottom: 15px; color: #333; }
+    
+    .admin-section { background: #e9ecef; padding: 20px; border-radius: 8px; margin: 20px 0; }
+    
+    @media (max-width: 768px) {
+      .charts-container { grid-template-columns: 1fr; }
+      .dashboard-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ML Dashboard - Student Engagement Analytics</h1>
+    
+    <!-- Admin/Import Section (Hidden by default) -->
+    <div class="admin-section" style="display: none; background: #e9ecef; padding: 20px; border-radius: 8px; margin: 20px 0;">
+      <h3>Admin Functions</h3>
+      
+      <!-- Import Data Section -->
+      <div style="margin-bottom: 20px;">
+        <h4>Import Data</h4>
+        <p class="hint">Authenticate on EForge <a href="https://se.eforge.online/users/login/" target="_blank">here</a> first, then get the session details <a href="https://se.eforge.online/textbook/get-session-info/" target="_blank">from here </a> and paste them below.</p>
+        <form action="{% url 'engagement:manual_import' %}" method="post" onsubmit="showLoading();">
+          {% csrf_token %}
+          <div class="row">
+            <input type="text" name="sessionid" placeholder="Session ID" required style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="text" name="csrftoken" placeholder="CSRF Token" required style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <button type="submit" style="background: #17a2b8;">Import Data</button>
+          </div>
+        </form>
+        <p id="loading" class="hidden">Importing... please wait.</p>
+      </div>
+      
+      <!-- Other Admin Functions -->
+      <div class="row">
+        <button onclick="toggleAdminSection()" style="background: #6c757d;">Hide Tools</button>
+        <button onclick="window.location.href='{% url 'engagement:export_csv' %}'" style="background: #28a745;">Export CSV</button>
+        <button onclick="window.location.href='{% url 'engagement:export_json' %}'" style="background: #6f42c1;">Export JSON</button>
+        <button onclick="window.location.href='/admin'" style="background: #c1427d;">Admin Panel</button>
+
+      </div>
+    </div>
+    
+    <!-- Show Admin Button -->
+    <div style="text-align: right; margin-bottom: 20px;">
+      <button onclick="toggleAdminSection()" style="background: #6c757d; font-size: 0.9em; padding: 8px 12px;">⚙️ Tools</button>
+    </div>
+    
+    <!-- Dashboard Metrics -->
+    {% if has_data %}
+    <div class="dashboard-grid">
+      <div class="metric-card">
+        <div class="metric-value">{{ total_time_hours }}h {{ total_time_minutes }}m</div>
+        <div class="metric-label">Total Time on Slides</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">{{ avg_accuracy }}%</div>
+        <div class="metric-label">Average Accuracy</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">{{ total_attempts }}</div>
+        <div class="metric-label">Total Attempts</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">{{ recent_predictions|length }}</div>
+        <div class="metric-label">Students Analyzed</div>
+      </div>
+    </div>
+    
+    <!-- Student Quick Access -->
+    <div class="chart-card" style="margin: 20px 0;">
+      <div class="chart-title">Quick Student Access</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 15px;">
+        {% for pred in recent_predictions %}
+        <a href="{% url 'engagement:student_dashboard' pred.student_id %}" 
+           style="display: block; padding: 10px; background: #f8f9fa; border-radius: 6px; text-decoration: none; color: #333; text-align: center; border: 1px solid #dee2e6;">
+          <strong>Student {{ pred.student_id }}</strong><br>
+          <small>Pred: {{ pred.predicted_score }}</small>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    </div>
+    
+    <!-- Charts -->
+    <div class="charts-container">
+      <div class="chart-card">
+        <div class="chart-title">Predicted vs Actual Scores</div>
+        <canvas id="scoresChart" width="400" height="300"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Feature Importance</div>
+        <canvas id="featureChart" width="400" height="300"></canvas>
+      </div>
+    </div>
+    {% else %}
+    <div class="metric-card" style="text-align: center; margin: 30px 0;">
+      <div class="metric-value">📊</div>
+      <div class="metric-label">Import data to see dashboard metrics</div>
+    </div>
+    {% endif %}
+  </div>
+<script>
+function toggleAdminSection() {
+  const adminSection = document.querySelector('.admin-section');
+  if (adminSection.style.display === 'none') {
+    adminSection.style.display = 'block';
+  } else {
+    adminSection.style.display = 'none';
+  }
+}
+
+function showLoading() {
+  document.getElementById('loading').classList.remove('hidden');
+}
+
+function getCookie(name) {
+  let m = document.cookie.match(new RegExp('(^| )'+name+'=([^;]+)')); 
+  return m ? m[2] : null;
+}
+
+
+// Chart.js Charts
+function createCharts() {
+  {% if has_data %}
+  // Predicted vs Actual Scores Chart
+  const scoresCtx = document.getElementById('scoresChart');
+  if (scoresCtx) {
+    new Chart(scoresCtx, {
+      type: 'bar',
+      data: {
+        labels: [{% for pred in recent_predictions %}'Student {{ pred.student_id }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+        datasets: [{
+          label: 'Predicted Score',
+          data: [{% for pred in recent_predictions %}{{ pred.predicted_score }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+          backgroundColor: 'rgba(54, 162, 235, 0.8)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1
+        }, {
+          label: 'Actual Score',
+          data: [{% for pred in recent_predictions %}{{ pred.actual_score }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+          backgroundColor: 'rgba(255, 99, 132, 0.8)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100
+          }
+        }
+      }
+    });
+  }
+
+  // Feature Importance Chart
+  const featureCtx = document.getElementById('featureChart');
+  if (featureCtx) {
+    new Chart(featureCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Time Spent', 'Accuracy', 'Attempts', 'Revisits'],
+        datasets: [{
+          data: [
+            {{ feature_importance.time_spent }},
+            {{ feature_importance.accuracy }},
+            {{ feature_importance.attempts }},
+            {{ feature_importance.revisits }}
+          ],
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 205, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)'
+          ],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  }
+  {% endif %}
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  // Initialize charts
+  createCharts();
+});
+</script>
+</body>
+</html>

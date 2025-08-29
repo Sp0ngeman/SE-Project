@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Authentication Required</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background:#f4f4f4; }
+    .card { max-width: 700px; margin: 0 auto; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    button { padding:10px 16px; border:0; border-radius:8px; cursor:pointer; color:#fff; background:#007bff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Authenticate with EForge SE</h2>
+    <ol>
+      <li>Open <a href="https://se.eforge.online" target="_blank">EForge SE</a> and log in.</li>
+      <li>Click the button below to capture your session.</li>
+    </ol>
+    <button id="auth" onclick="fetchSession()">Capture Session</button>
+    <p id="msg"></p>
+    
+    <div style="margin-top: 15px;">
+      <button onclick="window.location.href='/engagement/'" style="background: #6c757d; margin-right: 10px;">← Back to Dashboard</button>
+      <button onclick="window.location.href='/admin/'" style="background: #28a745;">Open Admin (Add Test Data)</button>
+    </div>
+    
+    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #ffc107;">
+      <h4>🔧 Troubleshooting Tips:</h4>
+      <ul style="margin: 10px 0; padding-left: 20px;">
+        <li><strong>Make sure you're logged into EForge SE</strong> in another tab</li>
+        <li><strong>Check browser console</strong> (F12) for detailed error messages</li>
+        <li><strong>Try manual session capture:</strong> <a href="https://se.eforge.online/textbook/get-session-info/" target="_blank">Click here</a></li>
+        <li><strong>For development:</strong> Use Django admin to add test data</li>
+      </ul>
+    </div>
+  </div>
+<script>
+const URL = "https://se.eforge.online/textbook/get-session-info/";
+function fetchSession(){
+  const btn = document.getElementById('auth'); 
+  btn.disabled = true;
+  document.getElementById('msg').innerText = "Working...";
+  
+  fetch(URL, { 
+    credentials: "include",
+    mode: 'cors',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Origin': window.location.origin,
+      'Referer': 'https://se.eforge.online/'
+    }
+  })
+  .then(r => {
+    console.log('Response status:', r.status);
+    console.log('Response headers:', r.headers);
+    
+    if (r.status === 403) {
+      throw new Error('403 Forbidden - Check if you are logged into EForge SE');
+    }
+    if (r.status === 401) {
+      throw new Error('401 Unauthorized - Session expired, please log in again');
+    }
+    if (!r.ok) {
+      throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+    }
+    return r.json();
+  })
+  .then(data => {
+     console.log('Response data:', data);
+     if (data.sessionid){
+       document.cookie = `sessionid=${data.sessionid}; path=/;`;
+       localStorage.setItem("sessionid", data.sessionid);
+       localStorage.setItem("csrftoken", data.csrftoken || "");
+       document.getElementById('msg').innerText = "Session captured. Go back to /engagement to import.";
+     } else {
+       document.getElementById('msg').innerText = "No session found. Please log in first.";
+       btn.disabled = false;
+     }
+  })
+  .catch(error => {
+     console.error('Fetch error:', error);
+     document.getElementById('msg').innerText = `Error: ${error.message}`;
+     btn.disabled = false;
+  });
+}
+</script>
+</body>
+</html>
