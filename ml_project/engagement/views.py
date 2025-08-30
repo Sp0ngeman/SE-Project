@@ -4,7 +4,7 @@ from requests.exceptions import RequestException, Timeout
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseBadRequest
-from django.contrib.auth import logout
+from django.contrib.auth import logout, authenticate, login
 from django.contrib.auth.models import User
 from .models import (
     TextbookSection, TextbookPage, TextbookSlide,
@@ -121,6 +121,18 @@ def get_dashboard_metrics():
 
 def auth_reminder(request):
     return render(request, "engagement/auth_reminder.html")
+
+def login_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return redirect('engagement:homepage')
+        else:
+            messages.error(request, 'Invalid username or password.')
+    return render(request, "engagement/login.html")
 
 def manual_import(request):
     if request.method != "POST":

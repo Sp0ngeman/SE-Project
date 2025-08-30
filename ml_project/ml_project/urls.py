@@ -21,5 +21,6 @@ from django.shortcuts import redirect
 urlpatterns = [
     path('', lambda request: redirect('engagement:homepage'), name='root'),
     path('admin/', admin.site.urls),
+    path('accounts/', include('allauth.urls')),
     path('engagement/', include('engagement.urls')),
 ]

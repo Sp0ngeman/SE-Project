@@ -1,7 +1,5 @@
 # Term 3 Software — Django ML Starter
 
-This is a **starter pack** for your Django project. Use it with the class instructions.
-
 ## Quick Start
 
 1) Create & activate a virtual env, install deps
@@ -41,4 +39,3 @@ python manage.py runserver
 - http://127.0.0.1:8000/engagement → import/dashboard
 - http://127.0.0.1:8000/admin → view data
 
-> Keep screenshots & logs for the NSW project booklet.

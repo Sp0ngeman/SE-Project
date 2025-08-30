@@ -5,6 +5,7 @@ app_name = "engagement"
 
 urlpatterns = [
     path('', views.homepage, name='homepage'),
+    path('login/', views.login_view, name='login'),
     path('manual-import/', views.manual_import, name='manual_import'),
     path('auth-reminder/', views.auth_reminder, name='auth_reminder'),
     path('predict/<int:student_id>/', views.predict_for_student, name='predict'),
